@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FUSEBOX — Secure Local Document Fusion</title>
+
+<!--
+  =====================================================================
+  FUSEBOX — PRIVACY MODEL
+  =====================================================================
+  This tool does NOT read the internal data, text, or structure of
+  your files. It captures each page as a complete picture and binds
+  those pictures into one PDF. Your content is never parsed,
+  indexed, analyzed, or interpreted — it is simply photographed,
+  page by page, locally in your browser.
+
+  Created by Malik Huzaifa Arif
+  =====================================================================
+-->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800;12..96,900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --bg:        #0a0e1a;        /* deep navy-black */
+  --bg-2:      #0f1422;
+  --panel:     #131a2b;
+  --panel-2:   #1a2238;
+  --line:      #243049;
+  --line-2:    #2e3d5c;
+  --ink:       #e8edf7;
+  --ink-dim:   #8a96b3;
+  --ink-muted: #5a6580;
+  --neon:      #00ffaa;        /* electric mint */
+  --volt:      #ffe83b;        /* voltage yellow */
+  --hot:       #ff3d6e;        /* hot pink/red */
+  --copper:    #ff8c42;        /* copper wire */
+  --ok:        #00ffaa;
+  --warn:      #ffe83b;
+  --err:       #ff3d6e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Circuit-board background pattern */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(46, 61, 92, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 61, 92, 0.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glow accents */
+body::after {
+  content: "";
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 600px 400px at 15% 10%, rgba(0, 255, 170, 0.08), transparent 60%),
+    radial-gradient(ellipse 500px 400px at 85% 90%, rgba(255, 61, 110, 0.06), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 50% 50%, rgba(255, 232, 59, 0.03), transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wrap {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 28px 60px;
+}
+
+/* ============ TOP BAR ============ */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 32px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-muted);
+}
+.topbar .left {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.topbar .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neon);
+}
+.topbar .status::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--neon);
+  box-shadow: 0 0 8px var(--neon);
+  animation: blink 1.5s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ============ HEADER / LOGO ============ */
+header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.logo-block {
+  position: relative;
+}
+.logo {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 900;
+  font-size: clamp(56px, 11vw, 140px);
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  color: var(--ink);
+  position: relative;
+  display: inline-block;
+}
+.logo .fuse {
+  background: linear-gradient(180deg, var(--ink) 0%, var(--ink) 60%, var(--copper) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo .box {
+  color: var(--neon);
+  position: relative;
+}
+.logo .box::after {
+  content: "";
+  position: absolute;
+  bottom: 12%;
+  left: -2%;
+  right: -2%;
+  height: 4px;
+  background: var(--neon);
+  box-shadow: 0 0 16px var(--neon);
+}
+
+.logo-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-top: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.logo-meta .div {
+  width: 24px; height: 1px;
+  background: var(--line-2);
+}
+
+.spec-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 20px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-align: right;
+  position: relative;
+}
+.spec-card::before {
+  content: "SPEC";
+  position: absolute;
+  top: -8px; right: 16px;
+  background: var(--bg);
+  padding: 0 8px;
+  color: var(--copper);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+.spec-card .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 0;
+  color: var(--ink-dim);
+}
+.spec-card .row .v { color: var(--ink); }
+.spec-card .row .v.on { color: var(--neon); }
+
+/* ============ HERO STRIP ============ */
+.hero-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--neon);
+  padding: 24px 28px;
+  margin-bottom: 40px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+.hero-strip::before {
+  content: "▲";
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 40px; height: 40px;
+  background: var(--neon);
+  color: var(--bg);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+.hero-strip h2 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.hero-strip h2 .accent { color: var(--neon); }
+.hero-strip p {
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  max-width: 720px;
+}
+.hero-strip p strong { color: var(--volt); font-weight: 600; }
+
+/* ============ FEATURE GRID (the "fuses") ============ */
+.fuses {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 48px;
+}
+.fuse {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 18px 16px;
+  position: relative;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.fuse:hover {
+  border-color: var(--neon);
+  transform: translateY(-2px);
+}
+.fuse .fuse-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--copper);
+  letter-spacing: 0.2em;
+  margin-bottom: 8px;
+}
+.fuse .fuse-title {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.fuse .fuse-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--neon);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fuse .fuse-status::before {
+  content: "";
+  width: 5px; height: 5px;
+  background: var(--neon);
+  box-shadow: 0 0 6px var(--neon);
+}
+
+/* ============ MAIN GRID ============ */
+.main {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 880px) {
+  .main { grid-template-columns: 1fr; }
+  .fuses { grid-template-columns: repeat(2, 1fr); }
+  header { grid-template-columns: 1fr; }
+  .spec-card { text-align: left; }
+  .topbar { font-size: 10px; flex-wrap: wrap; gap: 8px; }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  position: relative;
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px dashed var(--line);
+  background: var(--panel-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.panel-head .id { color: var(--copper); font-weight: 700; }
+.panel-head .label { color: var(--ink-dim); }
+.panel-body { padding: 24px; }
+
+.panel h3 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  margin-bottom: 18px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.panel h3 .num {
+  color: var(--neon);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ============ DROPZONE ============ */
+.dropzone {
+  border: 2px dashed var(--line-2);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 14px,
+      rgba(0, 255, 170, 0.02) 14px,
+      rgba(0, 255, 170, 0.02) 28px
+    );
+  padding: 44px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.dropzone::before, .dropzone::after {
+  content: "";
+  position: absolute;
+  width: 16px; height: 16px;
+  border: 2px solid var(--copper);
+}
+.dropzone::before {
+  top: -1px; left: -1px;
+  border-right: none; border-bottom: none;
+}
+.dropzone::after {
+  bottom: -1px; right: -1px;
+  border-left: none; border-top: none;
+}
+.dropzone:hover, .dropzone.drag {
+  border-color: var(--neon);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 14px,
+      rgba(0, 255, 170, 0.08) 14px,
+      rgba(0, 255, 170, 0.08) 28px
+    );
+}
+.dropzone .icon {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 900;
+  font-size: 56px;
+  color: var(--neon);
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(0, 255, 170, 0.4);
+}
+.dropzone .text {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.dropzone .text strong {
+  color: var(--ink);
+  font-weight: 700;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  letter-spacing: -0.01em;
+}
+.dropzone .formats {
+  margin-top: 18px;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--copper);
+  font-weight: 700;
+}
+input[type="file"] { display: none; }
+
+/* ============ FILE LIST ============ */
+.file-list { margin-top: 20px; }
+.file-list:empty { display: none; }
+.file-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--neon);
+  margin-bottom: 6px;
+  font-size: 13px;
+  animation: slideIn 0.3s ease-out;
+  transition: border-color 0.15s;
+}
+.file-row:hover { border-color: var(--line-2); border-left-color: var(--neon); }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.file-row .ext {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--volt);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg);
+  padding: 4px 6px;
+  text-align: center;
+  border: 1px solid var(--line);
+}
+.file-row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 600;
+}
+.file-row .size {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.file-row .rm {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 2px 8px;
+  transition: all 0.15s;
+}
+.file-row .rm:hover {
+  color: var(--hot);
+  border-color: var(--hot);
+}
+
+/* ============ OPTIONS ============ */
+.option-group { margin-bottom: 22px; }
+.option-group label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--copper);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.quality-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.quality-pick button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  padding: 14px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.quality-pick button strong {
+  display: block;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+.quality-pick button:hover {
+  border-color: var(--copper);
+  color: var(--ink);
+}
+.quality-pick button.on {
+  background: var(--neon);
+  border-color: var(--neon);
+  color: var(--bg);
+  box-shadow: 0 0 16px rgba(0, 255, 170, 0.3);
+}
+.quality-pick button.on strong { color: var(--bg); }
+
+input[type="text"] {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input[type="text"]:focus { border-color: var(--neon); }
+
+/* ============ THE SWITCH (Merge Button) ============ */
+.fuse-switch {
+  width: 100%;
+  margin-top: 24px;
+  background: var(--neon);
+  color: var(--bg);
+  border: none;
+  padding: 0;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
+  text-transform: uppercase;
+}
+.fuse-switch .label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px;
+  background: var(--neon);
+  position: relative;
+  z-index: 2;
+}
+.fuse-switch .bolt {
+  font-size: 22px;
+  font-weight: 900;
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.fuse-switch:hover:not(:disabled) {
+  box-shadow: 0 0 32px rgba(0, 255, 170, 0.5);
+}
+.fuse-switch:hover:not(:disabled) .bolt {
+  transform: translateX(4px) rotate(15deg);
+}
+.fuse-switch:active:not(:disabled) { transform: translateY(2px); }
+.fuse-switch:disabled {
+  background: var(--panel-2);
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+.fuse-switch:disabled .label {
+  background: var(--panel-2);
+}
+
+/* ============ PROGRESS ============ */
+.progress {
+  margin-top: 18px;
+  display: none;
+}
+.progress.show { display: block; }
+.progress-bar {
+  height: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--neon), var(--volt));
+  width: 0%;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 12px rgba(0, 255, 170, 0.6);
+}
+.progress-text {
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-family: 'JetBrains Mono', monospace;
+}
+.progress-text .count { color: var(--neon); }
+
+/* ============ LOG (terminal) ============ */
+.log {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  margin-top: 20px;
+  font-size: 11px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+.log.show { display: block; }
+.log-line { padding: 2px 0; color: var(--ink-dim); }
+.log-line .t { color: var(--ink-muted); margin-right: 8px; }
+.log-line.ok .lvl { color: var(--neon); }
+.log-line.warn .lvl { color: var(--volt); }
+.log-line.err .lvl { color: var(--hot); }
+.log-line.info .lvl { color: var(--copper); }
+.log-line .lvl {
+  display: inline-block;
+  width: 56px;
+  font-weight: 700;
+}
+
+/* ============ FOOTER ============ */
+footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: end;
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.credit {
+  display: block;
+}
+.credit .crafted {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--copper);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.credit .author {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.credit .author .plug {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--neon);
+  margin-right: 8px;
+  box-shadow: 0 0 8px var(--neon);
+  vertical-align: middle;
+  animation: blink 2s ease-in-out infinite;
+}
+.footer-meta {
+  text-align: right;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  line-height: 1.8;
+}
+.footer-meta .v { color: var(--ink-dim); }
+
+@media (max-width: 880px) {
+  footer { grid-template-columns: 1fr; }
+  .footer-meta { text-align: left; }
+}
+
+/* ============ MISC ============ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line-2); }
+::-webkit-scrollbar-thumb:hover { background: var(--neon); }
+
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: var(--neon);
+  color: var(--bg);
+  padding: 14px 28px;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  z-index: 100;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 12px 40px rgba(0, 255, 170, 0.4);
+  border: 1px solid var(--neon);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+#docx-renderer {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 794px;
+  background: white;
+  color: black;
+  padding: 60px;
+  font-family: 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Top status bar -->
+  <div class="topbar">
+    <div class="left">
+      <span>SYS::FUSEBOX/v1.0</span>
+      <span class="status">Circuit · Online</span>
+    </div>
+    <div>Local Mode · No Network</div>
+  </div>
+
+  <!-- Logo + spec card -->
+  <header>
+    <div class="logo-block">
+      <div class="logo">
+        <span class="fuse">FUSE</span><span class="box">BOX</span>
+      </div>
+      <div class="logo-meta">
+        <span>DOCUMENT FUSION</span>
+        <span class="div"></span>
+        <span>PAGE-AS-IMAGE</span>
+        <span class="div"></span>
+        <span>ZERO TRANSMIT</span>
+      </div>
+    </div>
+
+    <div class="spec-card">
+      <div class="row"><span>MODE</span><span class="v on">LOCAL</span></div>
+      <div class="row"><span>NETWORK</span><span class="v on">DISABLED</span></div>
+      <div class="row"><span>CLOUD</span><span class="v on">NONE</span></div>
+      <div class="row"><span>READS DATA</span><span class="v on">NEVER</span></div>
+    </div>
+  </header>
+
+  <!-- Hero strip -->
+  <div class="hero-strip">
+    <div>
+      <h2>Fuse documents into one. <span class="accent">Without ever opening them.</span></h2>
+      <p>
+        FUSEBOX captures every page as a <strong>complete image</strong> — like a photograph —
+        then binds those images into a single PDF. Nothing inside your documents is read,
+        parsed, or analyzed. The fusion happens entirely in your browser.
+      </p>
+    </div>
+  </div>
+
+  <!-- Feature fuses -->
+  <div class="fuses">
+    <div class="fuse">
+      <div class="fuse-id">F-01</div>
+      <div class="fuse-title">Local-Only Processing</div>
+      <div class="fuse-status">Active</div>
+    </div>
+    <div class="fuse">
+      <div class="fuse-id">F-02</div>
+      <div class="fuse-title">Page-as-Image Capture</div>
+      <div class="fuse-status">Active</div>
+    </div>
+    <div class="fuse">
+      <div class="fuse-id">F-03</div>
+      <div class="fuse-title">No Internal Data Read</div>
+      <div class="fuse-status">Active</div>
+    </div>
+    <div class="fuse">
+      <div class="fuse-id">F-04</div>
+      <div class="fuse-title">Zero Cloud · Zero Server</div>
+      <div class="fuse-status">Active</div>
+    </div>
+  </div>
+
+  <!-- Main work area -->
+  <div class="main">
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="id">CH-01</span>
+        <span class="label">Input Channel</span>
+      </div>
+      <div class="panel-body">
+        <h3><span class="num">[01]</span>Load your documents</h3>
+
+        <div class="dropzone" id="dropzone">
+          <div class="icon">⚡</div>
+          <div class="text">
+            <strong>Drop files here</strong> or click to browse
+          </div>
+          <div class="formats">PDF · DOCX · XLSX · PNG · JPG</div>
+          <input type="file" id="file-input" multiple
+                 accept=".pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.webp" />
+        </div>
+
+        <div class="file-list" id="file-list"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="id">CH-02</span>
+        <span class="label">Output Channel</span>
+      </div>
+      <div class="panel-body">
+        <h3><span class="num">[02]</span>Configure the fuse</h3>
+
+        <div class="option-group">
+          <label>Image Quality</label>
+          <div class="quality-pick" id="quality-pick">
+            <button data-q="low">
+              <strong>Light</strong>
+              smaller
+            </button>
+            <button data-q="medium" class="on">
+              <strong>Standard</strong>
+              balanced
+            </button>
+            <button data-q="high">
+              <strong>Sharp</strong>
+              crispest
+            </button>
+          </div>
+        </div>
+
+        <div class="option-group">
+          <label>Output Filename</label>
+          <input type="text" id="output-name" value="fusebox-output" />
+        </div>
+
+        <button class="fuse-switch" id="merge-btn" disabled>
+          <span class="label">
+            <span class="bolt">⚡</span>
+            Pull the Switch
+            <span class="bolt">⚡</span>
+          </span>
+        </button>
+
+        <div class="progress" id="progress">
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="progress-text">
+            <span id="progress-label">Initializing…</span>
+            <span class="count" id="progress-count">0 / 0</span>
+          </div>
+        </div>
+
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer with credit -->
+  <footer>
+    <div class="credit">
+      <div class="crafted">Crafted &amp; engineered by</div>
+      <div class="author"><span class="plug"></span>Malik Huzaifa Arif</div>
+    </div>
+    <div class="footer-meta">
+      <div class="v">FUSEBOX · v1.0</div>
+      <div>Built for privacy</div>
+      <div>© 2026 · All rights reserved</div>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Hidden offscreen renderer for DOCX & XLSX -->
+<div id="docx-renderer"></div>
+
+<div class="toast" id="toast">⚡ Fused · Saved to downloads</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const QUALITY = {
+  low:    { scale: 1.2, jpegQuality: 0.75 },
+  medium: { scale: 2.0, jpegQuality: 0.88 },
+  high:   { scale: 3.0, jpegQuality: 0.95 },
+};
+
+const state = {
+  files: [],
+  quality: "medium",
+};
+
+const $dropzone    = document.getElementById("dropzone");
+const $fileInput   = document.getElementById("file-input");
+const $fileList    = document.getElementById("file-list");
+const $qualityPick = document.getElementById("quality-pick");
+const $outputName  = document.getElementById("output-name");
+const $mergeBtn    = document.getElementById("merge-btn");
+const $log         = document.getElementById("log");
+const $toast       = document.getElementById("toast");
+const $progress    = document.getElementById("progress");
+const $progressFill= document.getElementById("progress-fill");
+const $progressLabel = document.getElementById("progress-label");
+const $progressCount = document.getElementById("progress-count");
+const $renderer    = document.getElementById("docx-renderer");
+
+const SUPPORTED = ["pdf", "docx", "xlsx", "xls", "png", "jpg", "jpeg", "webp"];
+const fmtSize = b => b < 1024 ? b + " B"
+                   : b < 1048576 ? (b/1024).toFixed(1) + " KB"
+                   : (b/1048576).toFixed(1) + " MB";
+const extOf = name => name.split(".").pop().toLowerCase();
+
+function log(msg, level = "info") {
+  $log.classList.add("show");
+  const t = new Date().toTimeString().slice(0, 8);
+  const line = document.createElement("div");
+  line.className = "log-line " + level;
+  line.innerHTML =
+    `<span class="t">${t}</span>` +
+    `<span class="lvl">[${level.toUpperCase()}]</span>` +
+    msg;
+  $log.appendChild(line);
+  $log.scrollTop = $log.scrollHeight;
+}
+
+function showToast(msg) {
+  $toast.textContent = msg;
+  $toast.classList.add("show");
+  setTimeout(() => $toast.classList.remove("show"), 3500);
+}
+
+function updateProgress(current, total, label) {
+  $progress.classList.add("show");
+  const pct = total > 0 ? (current / total) * 100 : 0;
+  $progressFill.style.width = pct + "%";
+  $progressLabel.textContent = label || "Working…";
+  $progressCount.textContent = `${current} / ${total}`;
+}
+
+function hideProgress() {
+  setTimeout(() => $progress.classList.remove("show"), 1200);
+}
+
+function refreshFileList() {
+  $fileList.innerHTML = "";
+  state.files.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.innerHTML = `
+      <span class="ext">${f.ext}</span>
+      <span class="name">${f.file.name}</span>
+      <span class="size">${fmtSize(f.file.size)}</span>
+      <button class="rm" data-id="${f.id}" title="remove">×</button>
+    `;
+    $fileList.appendChild(row);
+  });
+  $mergeBtn.disabled = state.files.length === 0;
+}
+
+$fileList.addEventListener("click", e => {
+  if (e.target.classList.contains("rm")) {
+    const id = e.target.dataset.id;
+    state.files = state.files.filter(f => f.id !== id);
+    refreshFileList();
+  }
+});
+
+function addFiles(fileList) {
+  for (const file of fileList) {
+    const ext = extOf(file.name);
+    if (!SUPPORTED.includes(ext)) {
+      log(`Skipped unsupported file: ${file.name}`, "warn");
+      continue;
+    }
+    state.files.push({ file, id: crypto.randomUUID(), ext });
+    log(`Loaded ${file.name} (${fmtSize(file.size)})`, "ok");
+  }
+  refreshFileList();
+}
+
+$dropzone.addEventListener("click", () => $fileInput.click());
+$fileInput.addEventListener("change", e => addFiles(e.target.files));
+
+["dragenter", "dragover"].forEach(evt =>
+  $dropzone.addEventListener(evt, e => {
+    e.preventDefault(); $dropzone.classList.add("drag");
+  })
+);
+["dragleave", "drop"].forEach(evt =>
+  $dropzone.addEventListener(evt, e => {
+    e.preventDefault(); $dropzone.classList.remove("drag");
+  })
+);
+$dropzone.addEventListener("drop", e => {
+  if (e.dataTransfer.files) addFiles(e.dataTransfer.files);
+});
+
+$qualityPick.addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  [...$qualityPick.children].forEach(b => b.classList.remove("on"));
+  btn.classList.add("on");
+  state.quality = btn.dataset.q;
+});
+
+// =====================================================================
+//  PAGE CAPTURE — page-as-image only, no internal data interpretation
+// =====================================================================
+
+function canvasToImage(canvas) {
+  const q = QUALITY[state.quality];
+  return canvas.toDataURL("image/jpeg", q.jpegQuality);
+}
+
+async function capturePDFPages(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const out = [];
+  const q = QUALITY[state.quality];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: q.scale });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    out.push({
+      img: canvasToImage(canvas),
+      width: baseViewport.width,
+      height: baseViewport.height,
+    });
+
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+  return out;
+}
+
+async function captureImageFile(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = url;
+    });
+
+    const maxW = 595, maxH = 842;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const ratio = Math.min(maxW / w, maxH / h, 1);
+    const pageW = Math.max(100, w * ratio);
+    const pageH = Math.max(100, h * ratio);
+
+    const q = QUALITY[state.quality];
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(pageW * q.scale);
+    canvas.height = Math.round(pageH * q.scale);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const result = [{
+      img: canvasToImage(canvas),
+      width: pageW,
+      height: pageH,
+    }];
+
+    canvas.width = 0; canvas.height = 0;
+    return result;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function captureDOCXPages(file) {
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+  $renderer.innerHTML = result.value;
+  return await snapshotElementToPages($renderer);
+}
+
+async function captureXLSXPages(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const allPages = [];
+
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    const html = XLSX.utils.sheet_to_html(sheet, { editable: false });
+    $renderer.innerHTML = `
+      <h2 style="font-family:'Times New Roman',serif;margin-bottom:16px;">${sheetName}</h2>
+      <style>
+        #docx-renderer table { border-collapse: collapse; font-size: 12px; }
+        #docx-renderer td, #docx-renderer th {
+          border: 1px solid #888; padding: 4px 8px;
+        }
+      </style>
+      ${html}
+    `;
+    const pages = await snapshotElementToPages($renderer);
+    allPages.push(...pages);
+  }
+  return allPages;
+}
+
+async function snapshotElementToPages(el) {
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
+
+  const totalHeight = el.scrollHeight;
+  const totalWidth  = el.scrollWidth || 794;
+
+  const A4_W = 794;
+  const A4_H = 1123;
+
+  const ratio = A4_W / totalWidth;
+  const scaledHeight = totalHeight * ratio;
+  const numPages = Math.max(1, Math.ceil(scaledHeight / A4_H));
+
+  const pages = [];
+  const q = QUALITY[state.quality];
+
+  for (let i = 0; i < numPages; i++) {
+    const yStart = i * (A4_H / ratio);
+    const canvasW = Math.round(A4_W * q.scale);
+    const canvasH = Math.round(A4_H * q.scale);
+
+    const svgString = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}" height="${canvasH}">
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="
+            transform: translateY(${-yStart * ratio * q.scale}px) scale(${ratio * q.scale});
+            transform-origin: top left;
+            width: ${totalWidth}px;
+            background: white;
+          ">${new XMLSerializer().serializeToString(el.cloneNode(true))}</div>
+        </foreignObject>
+      </svg>
+    `;
+
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = (e) => rej(new Error("snapshot failed"));
+        i.src = url;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvasW, canvasH);
+      ctx.drawImage(img, 0, 0);
+
+      pages.push({
+        img: canvasToImage(canvas),
+        width: A4_W * 0.75,
+        height: A4_H * 0.75,
+      });
+
+      canvas.width = 0; canvas.height = 0;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  return pages;
+}
+
+async function capturePages(entry) {
+  switch (entry.ext) {
+    case "pdf":   return capturePDFPages(entry.file);
+    case "docx":  return captureDOCXPages(entry.file);
+    case "xlsx":
+    case "xls":   return captureXLSXPages(entry.file);
+    case "png":
+    case "jpg":
+    case "jpeg":
+    case "webp":  return captureImageFile(entry.file);
+    default: throw new Error("Unsupported: " + entry.ext);
+  }
+}
+
+function buildPDFFromPages(pages, filename) {
+  const { jsPDF } = window.jspdf;
+  let doc = null;
+
+  pages.forEach((page) => {
+    const orientation = page.width > page.height ? "l" : "p";
+    if (!doc) {
+      doc = new jsPDF({
+        orientation,
+        unit: "pt",
+        format: [page.width, page.height],
+      });
+    } else {
+      doc.addPage([page.width, page.height], orientation);
+    }
+    doc.addImage(page.img, "JPEG", 0, 0, page.width, page.height);
+  });
+
+  doc.save(filename + ".pdf");
+}
+
+async function consolidate() {
+  $mergeBtn.disabled = true;
+  $log.innerHTML = "";
+  const baseName = ($outputName.value || "fusebox-output").replace(/\.[^/.]+$/, "");
+
+  log("Switch engaged. Beginning local fusion.", "info");
+  log(`Quality: ${state.quality}`, "info");
+  log("Note: file contents are NOT being read — capturing as images.", "info");
+
+  const allPages = [];
+
+  try {
+    for (let i = 0; i < state.files.length; i++) {
+      const entry = state.files[i];
+      updateProgress(i, state.files.length, `Capturing ${entry.file.name}`);
+      log(`[${i+1}/${state.files.length}] Capturing ${entry.file.name}`, "info");
+      try {
+        const pages = await capturePages(entry);
+        log(`    ${pages.length} page-image(s) captured`, "ok");
+        allPages.push(...pages);
+      } catch (e) {
+        log(`    failed: ${e.message}`, "err");
+        console.error(e);
+      }
+    }
+
+    if (allPages.length === 0) {
+      log("No pages captured. Nothing to fuse.", "err");
+      return;
+    }
+
+    updateProgress(state.files.length, state.files.length, "Fusing into PDF…");
+    log(`Fusing ${allPages.length} pages into single PDF…`, "info");
+    buildPDFFromPages(allPages, baseName);
+
+    log(`Saved ${baseName}.pdf to your downloads.`, "ok");
+    log("Fusion complete. Files never left this browser.", "ok");
+    showToast("⚡ Fused · saved locally");
+  } catch (e) {
+    log("Fault: " + e.message, "err");
+    console.error(e);
+  } finally {
+    hideProgress();
+    $mergeBtn.disabled = state.files.length === 0;
+  }
+}
+
+$mergeBtn.addEventListener("click", consolidate);
+
+log("FUSEBOX online. Drop documents to begin.", "ok");
+log("Engineered by Malik Huzaifa Arif.", "info");
+</script>
+</body>
+</html>
